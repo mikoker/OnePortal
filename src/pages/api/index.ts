@@ -1,17 +1,17 @@
+import { type NextRequest, NextResponse } from 'next/server'
 import { posix as pathPosix } from 'path-browserify'
 import axios from 'redaxios'
-
-import apiConfig from '../../../config/api.config'
-import siteConfig from '../../../config/site.config'
-import { getAuthPersonInfo, revealObfuscatedToken } from '../../utils/oAuthHandler'
-import { getOdAuthTokens, storeOdAuthTokens } from '../../utils/odAuthTokenStore'
-import { NextRequest, NextResponse } from 'next/server'
+import { getAuthPersonInfo, revealObfuscatedToken } from '@/utils/oAuthHandler'
+import { getOdAuthTokens, storeOdAuthTokens } from '@/utils/odAuthTokenStore'
+import { webTimingSafeEqual } from '@/utils/timingSafeEqual'
+import apiConfig from '~config/api.config'
+import siteConfig from '~config/site.config'
 
 export const runtime = 'edge'
 
 const basePath = pathPosix.resolve('/', siteConfig.baseDirectory)
 const clientSecret = revealObfuscatedToken(apiConfig.obfuscatedClientSecret)
-const protectedRoutes = siteConfig.protectedRoutes.map(r => r.toLowerCase().replace(/\/$/, '') + '/')
+const protectedRoutes = siteConfig.protectedRoutes.map(r => `${r.toLowerCase().replace(/\/$/, '')}/`)
 
 /**
  * Encode the path of the file relative to the base directory
@@ -71,7 +71,7 @@ export async function getAccessToken(): Promise<string> {
       })
       return access_token
     }
-  } catch (error) {
+  } catch (_) {
     // Silent fail and return empty token
   }
 
@@ -103,7 +103,7 @@ async function checkFileExists(filePath: string, accessToken: string): Promise<b
 export async function getAuthFilePath(path: string, accessToken: string) {
   // Ensure trailing slashes to compare paths component by component. Same for protectedRoutes.
   // Since OneDrive ignores case, lower case before comparing. Same for protectedRoutes.
-  path = path.toLowerCase() + '/'
+  path = `${path.toLowerCase()}/`
 
   for (const r of protectedRoutes) {
     if (path.startsWith(r)) {
@@ -166,9 +166,8 @@ export async function checkAuthRoute(
 
     if (authFilePath.endsWith('.password')) {
       const password = await fetchProtectedContent(authFilePath, accessToken)
-      return authPassword === password
-        ? { code: 200, message: 'Authenticated.' }
-        : { code: 401, message: 'Unauthorized.' }
+      const result: boolean = await webTimingSafeEqual(authPassword, password)
+      return result ? { code: 200, message: 'Authenticated.' } : { code: 401, message: 'Unauthorized.' }
     }
   } catch {
     return {

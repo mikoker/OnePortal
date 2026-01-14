@@ -55,32 +55,33 @@ const MarkdownPreview: FC<{
           width={width}
           height={height}
           style={style}
+          className="inline-block"
         />
       )
     },
-    code: ({
-      className,
-      children,
-      inline,
-      ...props
-    }: {
-      className?: string | undefined
-      children: ReactNode
-      inline?: boolean
-    }) => {
-      if (inline) {
+    code: ({ className, children, ...rest }: { className?: string | undefined; children: ReactNode }) => {
+      const match = /language-(\w+)/.exec(className || '')
+      const content = String(children).replace(/\n$/, '')
+
+      // If it's a code block (contains newline or has language)
+      if (match || content.includes('\n')) {
         return (
-          <code className={className} {...props}>
-            {children}
-          </code>
+          <SyntaxHighlighter
+            language={match ? match[1] : 'text'}
+            style={tomorrowNight}
+            PreTag="div"
+            wrapLongLines
+            {...rest}
+          >
+            {content}
+          </SyntaxHighlighter>
         )
       }
 
-      const match = /language-(\w+)/.exec(className || '')
       return (
-        <SyntaxHighlighter language={match ? match[1] : 'text'} style={tomorrowNight} PreTag="div" {...props}>
-          {String(children).replace(/\n$/, '')}
-        </SyntaxHighlighter>
+        <code className={className} {...rest}>
+          {children}
+        </code>
       )
     },
   }
